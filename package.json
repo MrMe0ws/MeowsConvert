@@ -1,0 +1,45 @@
+{
+  "name": "meowsconvert",
+  "productName": "MeowsConvert",
+  "version": "1.0.0",
+  "description": "Конвертер валют с калькулятором и виджетом для рабочего стола",
+  "author": "Meows",
+  "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MrMe0ws/MeowsConvert.git"
+  },
+  "main": "src/main.js",
+  "scripts": {
+    "start": "node scripts/start.js",
+    "icon": "node scripts/make-icon.js",
+    "dist": "node scripts/make-icon.js && electron-builder --win"
+  },
+  "build": {
+    "appId": "com.meowsconvert.app",
+    "productName": "MeowsConvert",
+    "files": [
+      "src/**/*",
+      "assets/**/*",
+      "!assets/icon-source.png",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "MeowsConvert"
+    }
+  },
+  "dependencies": {
+    "flag-icons": "^7.5.0"
+  },
+  "devDependencies": {
+    "electron": "^44.3.0",
+    "electron-builder": "^26.15.3"
+  }
+}

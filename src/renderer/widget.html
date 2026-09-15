@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:" />
+  <title>MeowsConvert — виджет</title>
+  <link rel="stylesheet" href="../../node_modules/flag-icons/css/flag-icons.min.css" />
+  <link rel="stylesheet" href="widget.css" />
+</head>
+<body>
+  <div class="widget" id="widget">
+    <div class="w-head">
+      <div class="w-brand">
+        <img class="w-icon" src="../../assets/icon-small.png" alt="" />
+        <div class="w-title">
+          <span>MeowsConvert</span>
+          <span id="status" class="status"></span>
+        </div>
+      </div>
+      <div class="w-actions">
+        <button id="w-refresh" title="Обновить курсы">
+          <svg viewBox="0 0 24 24"><path d="M12 5V2L7.5 6.5 12 11V7.5a5.5 5.5 0 1 1-5.5 5.5H4a8 8 0 1 0 8-8z"/></svg>
+        </button>
+        <button id="w-open" title="Открыть приложение">
+          <svg viewBox="0 0 24 24"><path d="M19 19H5V5h7V3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7h-2v7zM14 3v2h3.6l-9.8 9.8 1.4 1.4L19 6.4V10h2V3h-7z"/></svg>
+        </button>
+        <button id="w-menu" title="Меню">
+          <svg viewBox="0 0 24 24"><path d="M12 8a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm0 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm0 6a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/></svg>
+        </button>
+      </div>
+    </div>
+    <div id="rows" class="rows"></div>
+  </div>
+
+  <script src="currencies.js"></script>
+  <script src="shared.js"></script>
+  <script src="widget.js"></script>
+</body>
+</html>
