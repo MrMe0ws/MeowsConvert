@@ -1,5 +1,15 @@
 const $ = (sel) => document.querySelector(sel);
 
+// Высота окна подстраивается под содержимое. getBoundingClientRect считает раскладку сразу,
+// не дожидаясь кадра: ResizeObserver срабатывает только при отрисовке, а перекрытое окно может не рисоваться.
+let lastHeight = 0;
+function reportHeight() {
+  const h = Math.ceil($('#widget').getBoundingClientRect().height);
+  if (h === lastHeight) return;
+  lastHeight = h;
+  window.api.widgetResize(h);
+}
+
 const converter = window.MC.createConverter({
   rowsEl: $('#rows'),
   onRender: (state) => {
@@ -8,13 +18,11 @@ const converter = window.MC.createConverter({
     status.textContent = st.text;
     status.className = `status ${st.kind}`;
     $('#w-refresh').classList.toggle('spin', !!state.rates.loading);
+    reportHeight();
   },
 });
 
-// Высота окна подстраивается под количество валют
-new ResizeObserver(() => {
-  window.api.widgetResize($('#widget').getBoundingClientRect().height);
-}).observe($('#widget'));
+new ResizeObserver(reportHeight).observe($('#widget'));
 
 window.addEventListener('focus', () => document.body.classList.add('focused'));
 window.addEventListener('blur', () => document.body.classList.remove('focused'));

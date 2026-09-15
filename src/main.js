@@ -11,6 +11,7 @@ const {
 } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const desktopPin = require('./desktop-pin');
 
 const launchedAtLogin = process.argv.includes('--autostart');
 
@@ -20,6 +21,11 @@ if (!app.requestSingleInstanceLock()) {
 }
 
 app.setAppUserModelId('com.meowsconvert.app');
+
+// Виджет встроен в рабочий стол и почти всегда перекрыт окнами. Chromium считает такое окно
+// невидимым и перестаёт его рисовать, а для дочернего окна рабочего стола это состояние может
+// не сняться даже после «Свернуть всё» — виджет застывает. Отключаем расчёт перекрытия.
+app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
 
 const ASSETS = path.join(__dirname, '..', 'assets');
 const RENDERER = path.join(__dirname, 'renderer');
@@ -284,26 +290,48 @@ function createWidget() {
     alwaysOnTop: settings.widgetOnTop,
     title: 'MeowsConvert — виджет',
     icon: APP_ICON,
-    webPreferences,
+    webPreferences: { ...webPreferences, backgroundThrottling: false },
   });
-  widgetWindow.setOpacity(settings.widgetOpacity);
-  widgetWindow.loadFile(path.join(RENDERER, 'widget.html'));
-  widgetWindow.once('ready-to-show', () => widgetWindow.showInactive());
+  const win = widgetWindow;
+  win.setOpacity(settings.widgetOpacity);
+  win.loadFile(path.join(RENDERER, 'widget.html'));
+  win.once('ready-to-show', () => {
+    win.showInactive();
+    if (!settings.widgetOnTop) pinWidget(win);
+  });
 
-  widgetWindow.on('moved', () => {
-    const { x, y } = widgetWindow.getBounds();
+  win.on('moved', () => {
+    const { x, y } = win.getBounds();
     settings.widgetBounds = { x, y };
     saveSettings();
   });
-  widgetWindow.on('closed', () => {
-    widgetWindow = null;
+  win.on('closed', () => {
+    if (widgetWindow === win) widgetWindow = null;
+    // Окно закреплено внутри рабочего стола и погибает вместе с Explorer — поднимаем заново
+    if (!quitting && settings.widgetEnabled && !widgetWindow) setTimeout(() => setWidgetEnabled(true), 2000);
   });
+}
+
+// Explorer может ещё не создать рабочий стол (ранний автозапуск) — пробуем повторно
+function pinWidget(win, attempt = 0) {
+  if (win.isDestroyed() || settings.widgetOnTop) return;
+  if (desktopPin.pin(win)) return;
+  if (attempt < 30) setTimeout(() => pinWidget(win, attempt + 1), 2000);
 }
 
 function setWidgetEnabled(on) {
   settings.widgetEnabled = on;
   if (on && !widgetWindow) createWidget();
   if (!on && widgetWindow) widgetWindow.close();
+}
+
+// Смена режима «на рабочем столе» ↔ «поверх окон» — проще пересоздать окно
+function recreateWidget() {
+  if (!widgetWindow) return;
+  const old = widgetWindow;
+  widgetWindow = null;
+  old.destroy();
+  createWidget();
 }
 
 // ---------- Автозапуск ----------
@@ -366,11 +394,11 @@ function updateSettings(patch) {
 
   if ('autostart' in patch && patch.autostart !== prev.autostart) applyAutostart();
   if ('widgetEnabled' in patch && patch.widgetEnabled !== prev.widgetEnabled) setWidgetEnabled(patch.widgetEnabled);
-  if ('widgetOnTop' in patch && widgetWindow) widgetWindow.setAlwaysOnTop(settings.widgetOnTop);
+  if ('widgetOnTop' in patch && patch.widgetOnTop !== prev.widgetOnTop) recreateWidget();
   if ('widgetOpacity' in patch && widgetWindow) widgetWindow.setOpacity(settings.widgetOpacity);
   if ('mainOnTop' in patch && mainWindow) mainWindow.setAlwaysOnTop(settings.mainOnTop);
   if ('widgetBounds' in patch && patch.widgetBounds === null && widgetWindow) {
-    widgetWindow.setBounds(defaultWidgetPosition(widgetWindow.getBounds().height));
+    desktopPin.setBounds(widgetWindow, defaultWidgetPosition(widgetWindow.getBounds().height));
   }
   if ('source' in patch && patch.source !== prev.source) {
     applyCachedRates();
@@ -402,7 +430,7 @@ ipcMain.on('widget-resize', (_e, height) => {
   if (!widgetWindow) return;
   const b = widgetWindow.getBounds();
   const h = Math.max(60, Math.min(1200, Math.round(height)));
-  if (b.height !== h || b.width !== WIDGET_WIDTH) widgetWindow.setBounds({ ...b, width: WIDGET_WIDTH, height: h });
+  if (b.height !== h || b.width !== WIDGET_WIDTH) desktopPin.setBounds(widgetWindow, { ...b, width: WIDGET_WIDTH, height: h });
 });
 
 ipcMain.on('widget-menu', () => {

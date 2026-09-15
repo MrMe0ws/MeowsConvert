@@ -375,7 +375,7 @@ function renderSettings() {
     <div class="section-title">Виджет на рабочем столе</div>
     <div class="group">
       ${switchRow('widgetEnabled', 'Показывать виджет', 'Компактный конвертер на рабочем столе. Если включён, запускается вместе с приложением')}
-      ${switchRow('widgetOnTop', 'Виджет поверх всех окон', '', { disabled: !s.widgetEnabled })}
+      ${switchRow('widgetOnTop', 'Виджет поверх всех окон', 'Выключено: виджет встроен в рабочий стол — не перекрывает программы и не прячется при «Свернуть всё»', { disabled: !s.widgetEnabled })}
       <div class="item">
         <div class="item-text"><div class="item-title">Непрозрачность</div><div class="item-sub">${Math.round(s.widgetOpacity * 100)}%</div></div>
         <input type="range" min="40" max="100" step="5" value="${Math.round(s.widgetOpacity * 100)}" data-range="widgetOpacity" />

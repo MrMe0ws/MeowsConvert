@@ -36,7 +36,8 @@
     }
   },
   "dependencies": {
-    "flag-icons": "^7.5.0"
+    "flag-icons": "^7.5.0",
+    "koffi": "^3.3.0"
   },
   "devDependencies": {
     "electron": "^44.3.0",
