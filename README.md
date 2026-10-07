@@ -18,7 +18,7 @@
 
 [Последний релиз](https://github.com/MrMe0ws/MeowsConvert/releases/latest) — Windows 10/11 x64:
 
-- `MeowsConvert Setup X.Y.Z.exe` — установщик (ярлык на рабочем столе, удаление через «Приложения»);
+- `MeowsConvert.Setup.X.Y.Z.exe` — установщик (ярлык на рабочем столе, удаление через «Приложения»);
 - `MeowsConvert-X.Y.Z-portable.zip` — без установки: распаковать и запустить `MeowsConvert.exe`.
 
 Файлы не подписаны, поэтому SmartScreen может предупредить о неизвестном издателе:
