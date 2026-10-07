@@ -12,6 +12,7 @@ const {
 const path = require('path');
 const fs = require('fs');
 const desktopPin = require('./desktop-pin');
+const widgetPlace = require('./widget-place');
 
 const launchedAtLogin = process.argv.includes('--autostart');
 
@@ -48,6 +49,7 @@ const DEFAULT_SETTINGS = {
   widgetOnTop: false,
   widgetOpacity: 1,
   widgetBounds: null,
+  widgetPlace: null,
   mainBounds: null,
   conversion: { code: 'RUB', amount: 1000 },
 };
@@ -182,6 +184,7 @@ function refreshIfStale() {
 
 let mainWindow = null;
 let widgetWindow = null;
+let widgetHeight = 0; // высота по содержимому из последнего widget-resize
 let tray = null;
 let quitting = false;
 
@@ -271,16 +274,51 @@ function defaultWidgetPosition(height) {
   return { x: area.x + area.width - WIDGET_WIDTH - 24, y: area.y + 24, width: WIDGET_WIDTH, height };
 }
 
+// Запомненное место (монитор + отступ от края) → прямоугольник под текущие экраны
+function widgetPosition(height) {
+  // Настройки старых версий: только абсолютные x, y
+  const saved = settings.widgetBounds && { ...settings.widgetBounds, width: WIDGET_WIDTH, height };
+  if (!settings.widgetPlace && boundsVisible(saved)) {
+    settings.widgetPlace = widgetPlace.capture(saved);
+    saveSettings();
+  }
+  return widgetPlace.resolve(settings.widgetPlace, WIDGET_WIDTH, height) || defaultWidgetPosition(height);
+}
+
+// Сохраняется только когда виджет перетащили; перенастройка экранов место не трогает
+function rememberWidgetPlace() {
+  if (!widgetWindow) return;
+  const b = widgetWindow.getBounds();
+  settings.widgetBounds = { x: b.x, y: b.y };
+  settings.widgetPlace = widgetPlace.capture(b);
+  saveSettings();
+}
+
+// После смены мониторов: виджет мог уехать на другой экран или поменять размер — ставим как было
+function restoreWidgetPlace() {
+  const win = widgetWindow;
+  if (!win || win.isDestroyed()) return;
+  const b = win.getBounds();
+  const target = widgetPosition(widgetHeight || b.height);
+  if (target.x !== b.x || target.y !== b.y || target.width !== b.width || target.height !== b.height) {
+    desktopPin.setBounds(win, target);
+  }
+  desktopPin.raise(win);
+}
+
 function createWidget() {
-  const initialHeight = 90 + settings.currencies.length * 48;
-  const saved = settings.widgetBounds && { ...settings.widgetBounds, width: WIDGET_WIDTH, height: initialHeight };
-  const bounds = boundsVisible(saved) ? saved : defaultWidgetPosition(initialHeight);
+  const bounds = widgetPosition(widgetHeight || 90 + settings.currencies.length * 48);
 
   widgetWindow = new BrowserWindow({
     ...bounds,
     frame: false,
     transparent: true,
-    resizable: false,
+    // При resizable: false Chromium фиксирует размер окна, и SetWindowPos закреплённого виджета
+    // не может поменять размер (не вернуть его после смены масштаба экрана). Ширина всё равно
+    // постоянная — её держат minWidth/maxWidth, высота задаётся из кода (widget-resize).
+    resizable: true,
+    minWidth: WIDGET_WIDTH,
+    maxWidth: WIDGET_WIDTH,
     maximizable: false,
     minimizable: false,
     fullscreenable: false,
@@ -300,11 +338,7 @@ function createWidget() {
     if (!settings.widgetOnTop) pinWidget(win);
   });
 
-  win.on('moved', () => {
-    const { x, y } = win.getBounds();
-    settings.widgetBounds = { x, y };
-    saveSettings();
-  });
+  win.on('moved', rememberWidgetPlace);
   win.on('closed', () => {
     if (widgetWindow === win) widgetWindow = null;
     // Окно закреплено внутри рабочего стола и погибает вместе с Explorer — поднимаем заново
@@ -397,8 +431,9 @@ function updateSettings(patch) {
   if ('widgetOnTop' in patch && patch.widgetOnTop !== prev.widgetOnTop) recreateWidget();
   if ('widgetOpacity' in patch && widgetWindow) widgetWindow.setOpacity(settings.widgetOpacity);
   if ('mainOnTop' in patch && mainWindow) mainWindow.setAlwaysOnTop(settings.mainOnTop);
-  if ('widgetBounds' in patch && patch.widgetBounds === null && widgetWindow) {
-    desktopPin.setBounds(widgetWindow, defaultWidgetPosition(widgetWindow.getBounds().height));
+  if ('widgetBounds' in patch && patch.widgetBounds === null) {
+    settings.widgetPlace = null;
+    if (widgetWindow) desktopPin.setBounds(widgetWindow, defaultWidgetPosition(widgetWindow.getBounds().height));
   }
   if ('source' in patch && patch.source !== prev.source) {
     applyCachedRates();
@@ -430,6 +465,7 @@ ipcMain.on('widget-resize', (_e, height) => {
   if (!widgetWindow) return;
   const b = widgetWindow.getBounds();
   const h = Math.max(60, Math.min(1200, Math.round(height)));
+  widgetHeight = h;
   if (b.height !== h || b.width !== WIDGET_WIDTH) desktopPin.setBounds(widgetWindow, { ...b, width: WIDGET_WIDTH, height: h });
 });
 
@@ -491,6 +527,7 @@ app.whenReady().then(() => {
   createTray();
   if (!launchedAtLogin || !settings.hideMainOnAutostart) createMainWindow();
   if (settings.widgetEnabled) createWidget();
+  widgetPlace.watchDisplays(restoreWidgetPlace);
 
   refreshIfStale();
   setInterval(refreshIfStale, 5 * 60e3);
